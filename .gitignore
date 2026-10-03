@@ -1,0 +1,31 @@
+# Qt 构建产物（可用 qmake + make 重新生成，不入库）
+build-*/
+debug/
+release/
+*.o
+*.obj
+*.exe
+*.dll
+*.a
+*.so
+
+# qmake / 构建生成文件
+Makefile
+Makefile.Debug
+Makefile.Release
+.qmake.stash
+object_script.*
+ui_*.h
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+
+# Qt Creator 个人配置（与具体机器/套件绑定）
+*.pro.user
+*.pro.user.*
+*.autosave
+
+# 个人简历（含手机号/邮箱，不公开）
+resume.html
+# Visual Studio 本地缓存
+.vs/
