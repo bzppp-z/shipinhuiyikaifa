@@ -64,7 +64,7 @@ void MyFaceDetect::detectAndDisplay(Mat &frame, std::vector<Rect> &faces)
     //第六个参数 最小可能对象大小。小于该值的对象将被忽略。
     //第七个参数 最大可能对象大小。大于该值的对象将被忽略
     face_cascade.detectMultiScale( frame_gray, faces
-                                   , 1.1, 3, 0, Size(60,60) , Size(900, 900));
+                                   , 1.1, 6, 0, Size(100,100) , Size(900, 900));
 
 //    //绘制识别的人脸矩形
 //    for( auto ite = faces.begin() ; ite != faces.end() ; ++ite )
@@ -75,14 +75,53 @@ void MyFaceDetect::detectAndDisplay(Mat &frame, std::vector<Rect> &faces)
 //                 Scalar( 255, 0, 255 ), 4, 8, 0 );
 //    }
     //imshow( "capture_face", frame );
-//        //绘制识别的人脸矩形
-//        for( auto ite = faces.begin() ; ite != faces.end() ; ++ite )
-//        {
-//            Rect rct = *ite;
-//            Point center( rct.x + rct.width*0.5, rct.y + rct.height*0.5 );
-//            ellipse( frame, center, Size( rct.width*0.5, rct.height*0.5), 0, 0, 360,
-//                     Scalar( 255, 0, 255 ), 4, 8, 0 );
-//        }
+    //为了防止误识别, 再识别眼睛
+    for( auto ite = faces.begin() ; ite != faces.end() ; )
+    {
+        Rect rct = *ite;
+        Mat faceROI = frame_gray( rct );
+        std::vector<Rect> eyes;
+        //眼睛模型没加载成功时跳过误检过滤，直接保留人脸，避免空分类器断言
+        if( eyes_cascade.empty() )
+        {
+            ++ite;
+            continue;
+        }
+        //-- 在每张人脸上检测双眼
+        eyes_cascade.detectMultiScale( faceROI, eyes , 1.1, 2, 0 , Size(20, 20) );
+        //正常 鼻子的大小 应该不超过脸的 1/3
+        if( eyes.size() != 2 )
+        {
+            ite = faces.erase(ite);
+        }else
+        {
+            if( rct.height*0.5 < eyes[0].y ){
+                ite = faces.erase(ite);
+                continue;
+            }
+            // ellipse( frame, center, Size( rct.width*0.5, rct.height*0.5), 0, 0, 360,
+            //Scalar( 255, 0, 255 ), 4, 8, 0 );
+            // Rect rctnose;
+            // rctnose.x = nose[0].x + rct.x;
+            // rctnose.y = nose[0].y + rct.y;
+            // rctnose.width = nose[0].width;
+            // rctnose.height = nose[0].height;
+            // Point nosecenter( rctnose.x + rctnose.width*0.5, rctnose.y
+            //+rctnose.height*0.5 );
+            // ellipse( frame, nosecenter, Size( rctnose.width*0.5,
+            //rctnose.height*0.5),0, 0, 360, Scalar( 255, 0, 255 ), 4, 8, 0 );
+            ++ite;
+        }
+    }
+
+        //绘制识别的人脸矩形
+        for( auto ite = faces.begin() ; ite != faces.end() ; ++ite )
+        {
+            Rect rct = *ite;
+            Point center( rct.x + rct.width*0.5, rct.y + rct.height*0.5 );
+            ellipse( frame, center, Size( rct.width*0.5, rct.height*0.5), 0, 0, 360,
+                     Scalar( 255, 0, 255 ), 4, 8, 0 );
+        }
     //-- 显示结果图像
     //imshow( window_name_face, frame );
 }

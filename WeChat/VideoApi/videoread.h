@@ -34,8 +34,7 @@ public:
     cv::VideoCapture cap;
     QSharedPointer<VideoWorker>m_pVideoWorker;
     std::vector<Rect> m_lastface;
-    //下拉框: 0无滤镜 1圣诞帽子 2兔耳朵
-    enum mengpai_type{m_hat=1,m_tuer};
+    enum mengpai_type{m_tuer=1,m_hat};
     int m_mengpai;
     QImage Qimage_tuer;
      QImage Qimage_hat;
