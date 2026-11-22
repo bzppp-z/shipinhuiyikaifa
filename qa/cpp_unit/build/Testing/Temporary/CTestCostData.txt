@@ -1,0 +1,8 @@
+FrameCodecTest.EncodesLengthBeforePayload 1 0.00768993
+FrameCodecTest.RejectsInvalidLengths 1 0.00765479
+RoomManagerTest.CreatesAndTracksMembers 1 0.00826636
+RoomManagerTest.RejectsDuplicateAndUnknownMembers 1 0.00793955
+RoomManagerTest.RemovesEmptyRoom 1 0.00790137
+MediaRouterTest.ExcludesSender 1 0.00782674
+MediaRouterTest.KeepsEmptyResultForUnknownSender 1 0.00796264
+---

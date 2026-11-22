@@ -4,6 +4,9 @@ CONFIG -= app_bundle
 CONFIG -= qt
 
 SOURCES += \
+    src/FrameCodec.cpp \
+    src/RoomManager.cpp \
+    src/MediaRouter.cpp \
     src/Mysql.cpp \
     src/TCPKernel.cpp \
     src/Thread_pool.cpp \
@@ -13,6 +16,9 @@ SOURCES += \
     src/main.cpp
 
 HEADERS += \
+    include/FrameCodec.h \
+    include/RoomManager.h \
+    include/MediaRouter.h \
     include/Mysql.h \
     include/TCPKernel.h \
     include/Thread_pool.h \

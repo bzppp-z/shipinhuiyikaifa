@@ -1,0 +1,4 @@
+/mnt/c/Users/bzp20/Desktop/代码调试/shipinhuiyikaifa/qa/cpp_unit/build/CMakeFiles/meeting_cpp_unit.dir
+/mnt/c/Users/bzp20/Desktop/代码调试/shipinhuiyikaifa/qa/cpp_unit/build/CMakeFiles/test.dir
+/mnt/c/Users/bzp20/Desktop/代码调试/shipinhuiyikaifa/qa/cpp_unit/build/CMakeFiles/edit_cache.dir
+/mnt/c/Users/bzp20/Desktop/代码调试/shipinhuiyikaifa/qa/cpp_unit/build/CMakeFiles/rebuild_cache.dir

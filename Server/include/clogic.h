@@ -2,6 +2,7 @@
 #define CLOGIC_H
 
 #include"TCPKernel.h"
+#include "RoomManager.h"
 
 class CLogic
 {
@@ -42,7 +43,7 @@ private:
     TcpKernel* m_pKernel;
     CMysql * m_sql;
     Block_Epoll_Net * m_tcp;
-    MyMap<int,list<int>>m_mapIDToRoomid;
+    RoomManager m_roomManager;
 };
 
 #endif // CLOGIC_H

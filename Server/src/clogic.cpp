@@ -1,4 +1,5 @@
 #include "clogic.h"
+#include "MediaRouter.h"
 
 void CLogic::setNetPackMap()
 {
@@ -136,10 +137,8 @@ void CLogic::CreateRoomRq(sock_fd clientfd, char *szbuf, int nlen)
     do{
         roomid=rand()%99999999+1;
         //看有咩有房间号，可能循环随机，  map  roomid->list
-    }while(m_mapIDToRoomid.IsExist(roomid));
-    list<int>lit;
-    lit.push_back(rq->m_UserID);
-    m_mapIDToRoomid.insert(roomid,lit);
+    }while(m_roomManager.exists(roomid));
+    m_roomManager.create(roomid, rq->m_UserID);
     //回复
     STRU_CREATEROOM_RS rs;
     rs.m_RoomId=roomid;
@@ -154,7 +153,7 @@ void CLogic::JoinRoomRq(sock_fd clientfd, char *szbuf, int nlen)
     STRU_JOINROOM_RS rs;
     //查看房间是否存在
     //不存在 返回失败
-    if(!m_mapIDToRoomid.IsExist(rq->m_RoomID))
+    if(!m_roomManager.exists(rq->m_RoomID))
     {
         rs.m_lResult=0;
         m_pKernel->SendData(clientfd,(char*)&rs,sizeof(rs));
@@ -176,7 +175,7 @@ void CLogic::JoinRoomRq(sock_fd clientfd, char *szbuf, int nlen)
     m_pKernel->SendData(clientfd,(char *)&joinrq,sizeof(joinrq));
 
     //根据房间号拿到房间成员列表
-    list<int>lst=m_mapIDToRoomid.find(rq->m_RoomID);
+    vector<int> lst = m_roomManager.members(rq->m_RoomID);
     //遍历列表  互换信息
     for(auto ite=lst.begin();ite!=lst.end();ite++)
     {
@@ -197,8 +196,7 @@ void CLogic::JoinRoomRq(sock_fd clientfd, char *szbuf, int nlen)
         m_pKernel->SendData(clientfd,(char *)&memrq,sizeof(memrq));
     }
     //加入人 添加到房间列表
-    lst.push_back(rq->m_UserID);
-    m_mapIDToRoomid.insert(rq->m_RoomID,lst);
+    m_roomManager.addMember(rq->m_RoomID, rq->m_UserID);
 }
 
 void CLogic::LeaveRoomRq(int clientfd, char *szbuf, int nlen)
@@ -206,16 +204,16 @@ void CLogic::LeaveRoomRq(int clientfd, char *szbuf, int nlen)
     //拆包
     STRU_LEAVEROOM_RQ* rq=(STRU_LEAVEROOM_RQ*)szbuf;
     //看房间是否存在
-    if(!m_mapIDToRoomid.IsExist(rq->m_RoomId))return;
+    if(!m_roomManager.exists(rq->m_RoomId))return;
     //如果房间存在，可以获得用户列表
-    list<int>lst=m_mapIDToRoomid.find(rq->m_RoomId);
+    vector<int>lst = m_roomManager.members(rq->m_RoomId);
     //遍历每个用户，用户是否在线，在线转发
     for(auto it=lst.begin();it!=lst.end();)
     {
         //是不是自己，如果是自己 从链表里面移除——房间移除
         if(*it==rq->m_nUserId)
         {
-            it=lst.erase(it);
+            ++it;
         }
         else{
             //不是自己，看是否在线，在线转发
@@ -227,12 +225,7 @@ void CLogic::LeaveRoomRq(int clientfd, char *szbuf, int nlen)
             ++it;
         }
     }
-    //链表是否节点数为0  （全部退出）-》map去掉
-    if(lst.size()==0){
-        m_mapIDToRoomid.erase(rq->m_RoomId);
-    }
-    //更新成员列表
-    m_mapIDToRoomid.insert(rq->m_RoomId,lst);
+    m_roomManager.removeMember(rq->m_RoomId, rq->m_nUserId);
 }
  //处理音频帧
 void CLogic::AudioFrameRq(int clientfd, char *szbuf, int nlen)
@@ -247,13 +240,13 @@ void CLogic::AudioFrameRq(int clientfd, char *szbuf, int nlen)
     tmp+=sizeof(int);
     int roomid=*(int*)tmp;
     //看房间是否存在
-    if(!m_mapIDToRoomid.IsExist(roomid))return;
-    list<int> lst=m_mapIDToRoomid.find(roomid);
+    if(!m_roomManager.exists(roomid))return;
+    vector<int> lst = m_roomManager.members(roomid);
     //获取成员列表
-    for(auto v=lst.begin();v!=lst.end();v++)
+    vector<int> targets = MediaRouter::targets(lst, myuserid);
+    for(auto v=targets.begin();v!=targets.end();v++)
     {
         int userid=*v;
-        if(userid==myuserid)continue;
     //看是否在线，转发
         if(!m_pKernel->m_mapIDToUserInfo.IsExist(userid))continue;
         UserInfo* userinfo=m_pKernel->m_mapIDToUserInfo.find(userid);
@@ -273,13 +266,13 @@ void CLogic::VideoFrameRq(int clientfd, char *szbuf, int nlen)
     tmp+=sizeof(int);
     int roomid=*(int*)tmp;
     //看房间是否存在
-    if(!m_mapIDToRoomid.IsExist(roomid))return;
-    list<int> lst=m_mapIDToRoomid.find(roomid);
+    if(!m_roomManager.exists(roomid))return;
+    vector<int> lst = m_roomManager.members(roomid);
     //获取成员列表
-    for(auto v=lst.begin();v!=lst.end();v++)
+    vector<int> targets = MediaRouter::targets(lst, myuserid);
+    for(auto v=targets.begin();v!=targets.end();v++)
     {
         int userid=*v;
-        if(userid==myuserid)continue;
     //看是否在线，转发
         if(!m_pKernel->m_mapIDToUserInfo.IsExist(userid))continue;
         UserInfo* userinfo=m_pKernel->m_mapIDToUserInfo.find(userid);

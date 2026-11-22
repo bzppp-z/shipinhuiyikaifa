@@ -1,4 +1,5 @@
 #include "block_epoll_net.h"
+#include "FrameCodec.h"
 
 
 bool Block_Epoll_Net::InitNet(int port, void (*recv_callback)(int, char *, int))
@@ -160,8 +161,11 @@ void* Block_Epoll_Net::recv_task(void* arg)
     char *pSzBuf = NULL;
     do
     {
-        nRelReadNum = read(ev->fd,&nPackSize,sizeof(nPackSize) );
-        if(nRelReadNum <= 0)
+        int rawPackSize = 0;
+        nRelReadNum = read(ev->fd,&rawPackSize,sizeof(rawPackSize) );
+        if(nRelReadNum != sizeof(rawPackSize) ||
+                !FrameCodec::decodeLength(reinterpret_cast<const char*>(&rawPackSize),
+                                          sizeof(rawPackSize), nPackSize))
             break;
 
         pSzBuf = new char[nPackSize];
@@ -235,19 +239,10 @@ int Block_Epoll_Net::SendData(int fd, char *szbuf, int nlen)
      |<- packsize ->|<------------ 数据包 struct ------------>|
      * */
 
-    int nPackSize = nlen + 4;
-    vector<char> vecbuf( nPackSize , 0);
-    //vecbuf.resize( nPackSize );
-
-    char* buf = &* vecbuf.begin();
-    char* tmp = buf;
-    *(int*)tmp = nlen;//按四个字节int写入
-    tmp += sizeof(int );
-    memcpy( tmp , szbuf , nlen );
-
-    int res = send( fd,(const char *)buf, nPackSize ,0);
-
-    return res;
+    vector<char> frame = FrameCodec::encode(szbuf, nlen);
+    if(frame.empty())
+        return -1;
+    return send(fd, frame.data(), frame.size(), 0);
 }
 
 void Block_Epoll_Net::setNonBlockFd(int fd)

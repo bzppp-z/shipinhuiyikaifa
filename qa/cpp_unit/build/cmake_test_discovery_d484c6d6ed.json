@@ -1,0 +1,59 @@
+{
+  "tests": 7,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "FrameCodecTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "EncodesLengthBeforePayload",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/FrameCodecTest.cpp",
+          "line": 5
+        },
+        {
+          "name": "RejectsInvalidLengths",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/FrameCodecTest.cpp",
+          "line": 17
+        }
+      ]
+    },
+    {
+      "name": "RoomManagerTest",
+      "tests": 3,
+      "testsuite": [
+        {
+          "name": "CreatesAndTracksMembers",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/RoomManagerTest.cpp",
+          "line": 5
+        },
+        {
+          "name": "RejectsDuplicateAndUnknownMembers",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/RoomManagerTest.cpp",
+          "line": 14
+        },
+        {
+          "name": "RemovesEmptyRoom",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/RoomManagerTest.cpp",
+          "line": 23
+        }
+      ]
+    },
+    {
+      "name": "MediaRouterTest",
+      "tests": 2,
+      "testsuite": [
+        {
+          "name": "ExcludesSender",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/MediaRouterTest.cpp",
+          "line": 5
+        },
+        {
+          "name": "KeepsEmptyResultForUnknownSender",
+          "file": "\/mnt\/c\/Users\/bzp20\/Desktop\/\u00E4\u00BB\u00A3\u00E7\u00A0\u0081\u00E8\u00B0\u0083\u00E8\u00AF\u0095\/shipinhuiyikaifa\/qa\/cpp_unit\/MediaRouterTest.cpp",
+          "line": 11
+        }
+      ]
+    }
+  ]
+}

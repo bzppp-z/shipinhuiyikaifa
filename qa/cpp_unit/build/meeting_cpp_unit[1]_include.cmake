@@ -1,0 +1,5 @@
+if(EXISTS "/mnt/c/Users/bzp20/Desktop/代码调试/shipinhuiyikaifa/qa/cpp_unit/build/meeting_cpp_unit[1]_tests.cmake")
+  include("/mnt/c/Users/bzp20/Desktop/代码调试/shipinhuiyikaifa/qa/cpp_unit/build/meeting_cpp_unit[1]_tests.cmake")
+else()
+  add_test(meeting_cpp_unit_NOT_BUILT meeting_cpp_unit_NOT_BUILT)
+endif()
