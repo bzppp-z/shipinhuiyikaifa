@@ -82,24 +82,33 @@ def login_pressure(users: int, workers: int) -> dict:
 
 
 def setup_room(room_count: int, users_per_room: int) -> tuple[list[ProtocolClient], list[int]]:
-    clients: list[ProtocolClient] = []
-    user_ids: list[int] = []
     total = room_count * users_per_room
-    for index in range(total):
-        client, user_id = _login_client(index + 1000)
-        clients.append(client)
-        user_ids.append(user_id)
+    with ThreadPoolExecutor(max_workers=min(50, total)) as pool:
+        setup_results = list(pool.map(_login_client, range(total)))
+    clients = [result[0] for result in setup_results]
+    user_ids = [result[1] for result in setup_results]
 
-    for room_index in range(room_count):
-        start = room_index * users_per_room
-        owner = clients[start]
-        result, room_id = owner.create_room(user_ids[start])
+    def create_room(room_index: int) -> tuple[int, int]:
+        owner_index = room_index * users_per_room
+        result, room_id = clients[owner_index].create_room(user_ids[owner_index])
         if result != 1:
             raise RuntimeError("room creation failed")
-        for offset in range(1, users_per_room):
-            result, joined = clients[start + offset].join_room(user_ids[start + offset], room_id)
-            if result != 1 or joined != room_id:
-                raise RuntimeError("room join failed")
+        return room_index, room_id
+
+    with ThreadPoolExecutor(max_workers=room_count) as pool:
+        room_results = list(pool.map(create_room, range(room_count)))
+    room_ids = dict(room_results)
+
+    def join_room(index: int) -> bool:
+        room_index = index // users_per_room
+        if index % users_per_room == 0:
+            return True
+        result, joined = clients[index].join_room(user_ids[index], room_ids[room_index])
+        return result == 1 and joined == room_ids[room_index]
+
+    with ThreadPoolExecutor(max_workers=min(50, total)) as pool:
+        if not all(pool.map(join_room, range(total))):
+            raise RuntimeError("room join failed")
     return clients, user_ids
 
 
