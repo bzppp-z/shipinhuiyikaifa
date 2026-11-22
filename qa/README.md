@@ -19,3 +19,23 @@ pytest -c qa\pytest.ini qa\tests\test_server_available.py `
 $env:MEETING_SERVER_HOST = "127.0.0.1"
 $env:MEETING_SERVER_PORT = "8000"
 ```
+
+统一运行回归并按时间生成 HTML、JUnit XML 和 JSON 清单：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File qa\scripts\run_regression.ps1
+```
+
+在 WSL2 中运行 C++ 单元测试：
+
+```bash
+bash qa/scripts/run_cpp_unit.sh
+```
+
+比较两个版本的 JUnit 结果：
+
+```powershell
+python qa\scripts\compare_reports.py qa\reports\current.xml --baseline qa\reports\baseline.xml
+```
+
+Qt 冒烟默认只检查工程资源；设置 `MEETING_QT_EXE` 后才会启动并立即关闭真实 Qt 可执行文件。

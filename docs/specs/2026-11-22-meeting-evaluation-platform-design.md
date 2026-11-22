@@ -61,7 +61,7 @@
 - `pytest-timeout`：避免网络场景永久阻塞。
 - `pytest-html`：生成可读 HTML 报告；同时使用 pytest 内置 `--junitxml` 输出 CI 兼容报告。
 - 可选 `pytest-cov`：统计 Python 测试工具本身的覆盖率，不把它误认为 C++ 服务端覆盖率。
-- C++ 单测使用 GoogleTest；若目标机器安装成本过高，可使用 Catch2 或 doctest，但项目中只选择一种。
+- C++ 单测使用 GoogleTest 和 CMake；若目标机器安装成本过高，可使用 Catch2 或 doctest，但项目中只选择一种。
 
 ### Configuration
 
@@ -105,10 +105,10 @@ qa/
   cpp_unit/
     FrameCodecTest.cpp
     RoomManagerTest.cpp
-    cpp_unit.pro
+    CMakeLists.txt
 ```
 
-`qa/` 只依赖公开的协议行为，不直接引用 Qt 窗口对象。C++ 单测可以随服务端一起编译，也可以作为单独 qmake target 编译。
+`qa/` 只依赖公开的协议行为，不直接引用 Qt 窗口对象。C++ 单测作为独立 CMake target 编译，不需要启动完整服务端。
 
 ## Architecture
 
@@ -226,7 +226,7 @@ optional Qt smoke ── Windows Qt client ── TCP ── WSL2/Linux VM: meet
 
 ### Stage 3: C++ pure unit tests
 
-从现有服务端抽取 `FrameCodec`、`RoomManager` 和媒体路由纯逻辑，加入 GoogleTest 和独立 qmake target。
+从现有服务端抽取 `FrameCodec`、`RoomManager` 和媒体路由纯逻辑，加入 GoogleTest 和独立 CMake target。
 
 ### Stage 4: metrics and version comparison
 
