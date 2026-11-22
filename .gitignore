@@ -37,3 +37,5 @@ qa/**/__pycache__/
 qa/reports/*
 !qa/reports/.gitkeep
 Server/Server
+
+qa/cpp_unit/build/
