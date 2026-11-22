@@ -269,3 +269,13 @@ shipinhuiyikaifa/
 
 具体并发数、通过率和延迟只填写实际运行得到的数据。
 
+## 当前验证基线
+
+2026-11-22 在 WSL2 服务端和 Windows Python 3.12 测试机上完成：
+
+- Python/pytest：15 passed，1 skipped。
+- C++/GoogleTest：7/7 passed。
+- 覆盖注册、登录、房间创建/加入、媒体转发、断线、并发、协议半包和 Qt 工程资源检查。
+- Qt 可执行文件冒烟测试因未设置 `MEETING_QT_EXE` 自动跳过；设置该变量后可启用。
+- HTML/JUnit/JSON 报告由 `qa/scripts/run_regression.ps1` 生成到本地 `qa/reports/`，报告文件不提交到 Git。
+
