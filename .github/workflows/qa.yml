@@ -1,0 +1,42 @@
+name: QA
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  cpp-unit:
+    name: C++ unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install C++ test dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ libgtest-dev
+      - name: Run GoogleTest suite
+        run: bash qa/scripts/run_cpp_unit.sh
+
+  python-pure:
+    name: Pure Python protocol tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install QA dependencies
+        run: python -m pip install -r qa/requirements.txt
+      - name: Run pure tests only
+        run: >-
+          pytest -c qa/pytest.ini qa/tests
+          -m "not integration and not media"
+          --junitxml=qa-report.xml
+          --html=qa-report.html
+          --self-contained-html
+      - name: Upload Python QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-qa-reports
+          path: |
+            qa-report.xml
+            qa-report.html

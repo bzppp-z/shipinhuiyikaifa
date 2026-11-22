@@ -50,3 +50,15 @@ python qa\scripts\run_load_test.py --scenario login --users 100
 python qa\scripts\run_load_test.py --scenario rooms --rooms 5 --users-per-room 10
 python qa\scripts\run_load_test.py --scenario media --users 5 --duration 60 --fps 2
 ```
+
+GitHub Actions 工作流位于 `.github/workflows/qa.yml`，每次 push 或 Pull Request 自动执行：
+
+- GoogleTest C++ 单元测试。
+- 本地协议编解码和纯 Python 测试。
+
+依赖真实 MySQL、运行中服务端、房间状态、音视频 socket 和持续压力的测试，不在 GitHub 公共 runner 中执行，继续通过本地或专用 WSL2 环境运行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File qa\scripts\run_regression.ps1
+python qa\scripts\run_load_test.py --scenario all
+```

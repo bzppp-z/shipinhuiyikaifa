@@ -1,6 +1,11 @@
 import os
 import socket
 
+import pytest
+
+
+pytestmark = pytest.mark.integration
+
 
 def test_server_port_open():
     """The regression runner can reach the running Linux meeting server."""
