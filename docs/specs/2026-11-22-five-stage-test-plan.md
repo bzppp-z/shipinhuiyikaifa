@@ -279,3 +279,49 @@ shipinhuiyikaifa/
 - Qt 可执行文件冒烟测试因未设置 `MEETING_QT_EXE` 自动跳过；设置该变量后可启用。
 - HTML/JUnit/JSON 报告由 `qa/scripts/run_regression.ps1` 生成到本地 `qa/reports/`，报告文件不提交到 Git。
 
+## 阶段六：压力与负载评测
+
+在五阶段回归稳定后，增加独立的负载脚本 `qa/scripts/run_load_test.py`，不把压力场景混入每次快速回归。
+
+### 场景
+
+| 场景 | 规模 | 目标 |
+| --- | ---: | --- |
+| 登录压力 | 5 基线、20、50、100 用户 | 连接、线程池和数据库并发处理 |
+| 房间压力 | 5 个房间、每房间 10 用户 | 房间隔离、成员状态和通知 |
+| 媒体压力 | 每房间多个用户、合成视频帧、持续 60 秒 | 转发延迟、投递比例和阻塞发送 |
+
+### 指标
+
+- 成功/失败数量和成功率。
+- 登录吞吐量。
+- P95 延迟。
+- 媒体发送帧数、接收帧数和投递比例。
+- 媒体接收 P95 延迟。
+- 测试持续时间和错误类型。
+
+运行示例：
+
+```powershell
+python qa/scripts/run_load_test.py --scenario login --users 5
+python qa/scripts/run_load_test.py --scenario login --users 20
+python qa/scripts/run_load_test.py --scenario login --users 50
+python qa/scripts/run_load_test.py --scenario rooms --rooms 5 --users-per-room 10
+python qa/scripts/run_load_test.py --scenario media --users 5 --duration 60 --fps 2
+```
+
+压力结果写入 `qa/reports/load-result.json`，不进入 Git。100 用户场景作为可选扩展，先确认 50 用户结果稳定后再运行。
+
+### 实际运行基线（2026-11-22）
+
+| 场景 | 结果 |
+| --- | --- |
+| 登录 5 用户 | 5/5 成功，吞吐量 85.87/s，P95 56.11ms |
+| 登录 20 用户 | 20/20 成功，吞吐量 99.48/s，P95 181.09ms |
+| 登录 50 用户 | 50/50 成功，吞吐量 107.94/s，P95 299.41ms |
+| 登录 100 用户 | 100/100 成功，吞吐量 112.49/s，P95 254.16ms |
+| 房间 5×10 用户 | 50/50 成功，耗时 1.517s |
+| 媒体 5 用户×60 秒 | 发送 600 帧，接收 2400 帧，投递比例 1.0，P95 15.0ms |
+
+登录压力使用 20 个 Python worker；媒体压力使用合成视频帧和 2 FPS，指标只代表当前本地 WSL2 环境，不代表互联网生产容量。
+

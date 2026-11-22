@@ -39,3 +39,14 @@ python qa\scripts\compare_reports.py qa\reports\current.xml --baseline qa\report
 ```
 
 Qt 冒烟默认只检查工程资源；设置 `MEETING_QT_EXE` 后才会启动并立即关闭真实 Qt 可执行文件。
+
+运行压力场景：
+
+```powershell
+python qa\scripts\run_load_test.py --scenario login --users 5
+python qa\scripts\run_load_test.py --scenario login --users 20
+python qa\scripts\run_load_test.py --scenario login --users 50
+python qa\scripts\run_load_test.py --scenario login --users 100
+python qa\scripts\run_load_test.py --scenario rooms --rooms 5 --users-per-room 10
+python qa\scripts\run_load_test.py --scenario media --users 5 --duration 60 --fps 2
+```
