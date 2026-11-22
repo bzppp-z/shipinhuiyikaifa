@@ -9,7 +9,9 @@ from .packets import (
     PACK_LOGIN_RS,
     PACK_REGISTER_RS,
     create_room_request,
+    audio_register_request,
     join_room_request,
+    video_register_request,
     login_request,
     login_response,
     register_request,
@@ -42,10 +44,25 @@ class ProtocolClient:
         self.close()
 
     def request(self, payload: bytes) -> bytes:
+        self.send_only(payload)
+        return self.receive()
+
+    def send_only(self, payload: bytes) -> None:
         if self.sock is None:
             raise RuntimeError("client is not connected")
         self.sock.sendall(pack_frame(payload))
-        return recv_frame(self.sock)
+
+    def receive(self, timeout: float | None = None) -> bytes:
+        if self.sock is None:
+            raise RuntimeError("client is not connected")
+        previous_timeout = self.sock.gettimeout()
+        if timeout is not None:
+            self.sock.settimeout(timeout)
+        try:
+            return recv_frame(self.sock)
+        finally:
+            if timeout is not None:
+                self.sock.settimeout(previous_timeout)
 
     def register(self, tel: str, password: str, name: str) -> int:
         payload = self.request(register_request(tel, password, name))
@@ -61,6 +78,12 @@ class ProtocolClient:
 
     def join_room(self, user_id: int, room_id: int) -> tuple[int, int]:
         return room_response(self.request(join_room_request(user_id, room_id)), PACK_JOIN_ROOM_RS)
+
+    def register_audio(self, user_id: int) -> None:
+        self.send_only(audio_register_request(user_id))
+
+    def register_video(self, user_id: int) -> None:
+        self.send_only(video_register_request(user_id))
 
 
 __all__ = ["LOGIN_SUCCESS", "ProtocolClient"]

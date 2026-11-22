@@ -11,6 +11,12 @@ PACK_CREATE_ROOM_RQ = PACK_BASE + 4
 PACK_CREATE_ROOM_RS = PACK_BASE + 5
 PACK_JOIN_ROOM_RQ = PACK_BASE + 6
 PACK_JOIN_ROOM_RS = PACK_BASE + 7
+PACK_ROOM_MEMBER = PACK_BASE + 8
+PACK_AUDIO_FRAME = PACK_BASE + 9
+PACK_VIDEO_FRAME = PACK_BASE + 10
+PACK_LEAVE_ROOM_RQ = PACK_BASE + 11
+PACK_AUDIO_REGISTER = PACK_BASE + 14
+PACK_VIDEO_REGISTER = PACK_BASE + 15
 
 REGISTER_SUCCESS = 1
 TEL_EXISTS = 0
@@ -57,6 +63,19 @@ def create_room_request(user_id: int) -> bytes:
 
 def join_room_request(user_id: int, room_id: int) -> bytes:
     return struct.pack("<iii", PACK_JOIN_ROOM_RQ, user_id, room_id)
+
+
+def audio_register_request(user_id: int) -> bytes:
+    return struct.pack("<ii", PACK_AUDIO_REGISTER, user_id)
+
+
+def video_register_request(user_id: int) -> bytes:
+    return struct.pack("<ii", PACK_VIDEO_REGISTER, user_id)
+
+
+def media_frame(packet_type: int, user_id: int, room_id: int, body: bytes) -> bytes:
+    # The current client protocol uses type, user, room and three time fields.
+    return struct.pack("<iiiiii", packet_type, user_id, room_id, 0, 0, 0) + body
 
 
 def result_response(payload: bytes, expected_type: int) -> int:
