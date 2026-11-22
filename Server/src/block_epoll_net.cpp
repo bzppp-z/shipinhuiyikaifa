@@ -1,6 +1,26 @@
 #include "block_epoll_net.h"
 #include "FrameCodec.h"
 
+namespace {
+bool read_full(int fd, char *buffer, int size)
+{
+    int offset = 0;
+    while (offset < size)
+    {
+        int received = recv(fd, buffer + offset, size - offset, 0);
+        if (received > 0)
+        {
+            offset += received;
+            continue;
+        }
+        if (received < 0 && errno == EINTR)
+            continue;
+        return false;
+    }
+    return true;
+}
+}
+
 
 bool Block_Epoll_Net::InitNet(int port, void (*recv_callback)(int, char *, int))
 {
@@ -156,30 +176,23 @@ void* Block_Epoll_Net::recv_task(void* arg)
     Block_Epoll_Net * pthis = ev->pNet;
 
     //接收和处理分离
-    int nRelReadNum = 0;
     int nPackSize = 0;
     char *pSzBuf = NULL;
     do
     {
         int rawPackSize = 0;
-        nRelReadNum = read(ev->fd,&rawPackSize,sizeof(rawPackSize) );
-        if(nRelReadNum != sizeof(rawPackSize) ||
+        if(!read_full(ev->fd, reinterpret_cast<char*>(&rawPackSize), sizeof(rawPackSize)) ||
                 !FrameCodec::decodeLength(reinterpret_cast<const char*>(&rawPackSize),
                                           sizeof(rawPackSize), nPackSize))
             break;
 
         pSzBuf = new char[nPackSize];
-        int nOffSet = 0;
-        nRelReadNum = 0;
-        //接收包的数据
-        while(nPackSize)
+        int nOffSet = nPackSize;
+        if(!read_full(ev->fd, pSzBuf, nPackSize))
         {
-            nRelReadNum = recv(ev->fd,pSzBuf+nOffSet,nPackSize,0);
-            if(nRelReadNum <= 0)
-                break;
-
-            nOffSet += nRelReadNum;
-            nPackSize -= nRelReadNum;
+            delete [] pSzBuf;
+            pSzBuf = NULL;
+            break;
         }
         //接收和处理分离 跑线程池里其他线程处理 , 避免处理影响接收
         DataBuffer * buffer = new DataBuffer(ev->pNet , ev->fd , pSzBuf , nOffSet );
