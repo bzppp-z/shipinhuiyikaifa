@@ -29,3 +29,11 @@ qrc_*.cpp
 resume.html
 # Visual Studio 本地缓存
 .vs/
+
+# QA 本地环境、缓存、报告和生成的服务端二进制
+.venv-qa/
+qa/.pytest_cache/
+qa/**/__pycache__/
+qa/reports/*
+!qa/reports/.gitkeep
+Server/Server
