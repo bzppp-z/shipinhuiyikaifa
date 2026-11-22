@@ -325,3 +325,105 @@ python qa/scripts/run_load_test.py --scenario media --users 5 --duration 60 --fp
 
 登录压力使用 20 个 Python worker；媒体压力使用合成视频帧和 2 FPS，指标只代表当前本地 WSL2 环境，不代表互联网生产容量。
 
+
+## 阶段七：CI 自动运行的快速质量门禁
+
+阶段七把不依赖外部服务的检查放进 GitHub Actions，每次 push 和 Pull Request 自动执行：
+
+- C++/GoogleTest 单元测试，验证协议编解码、房间状态和媒体路由纯逻辑；
+- 纯 Python 协议编解码测试，验证定长字段、边界长度、半包重组和响应解析；
+- Qt 工程资源检查，确认 `.pro`、头文件和源文件仍然完整。
+
+CI 不启动真实 MySQL、WSL 服务端、房间集成、音视频 socket 或压力场景。这些场景依赖本机服务和可控数据，继续由阶段三至六的本地回归脚本执行，避免公共 runner 把环境问题误报成代码回归。
+
+### 阶段七文件
+
+```text
+.github/workflows/qa.yml       # push/PR 触发的 CI
+qa/cpp_unit/                   # GoogleTest 测试和 CMake 配置
+qa/tests/test_protocol.py     # 纯 Python 协议测试
+qa/tests/test_compare_reports.py
+qa/reports/                   # 本地报告（被 .gitignore 忽略）
+```
+
+### 阶段七验收结果
+
+本地按 CI 相同筛选条件运行：4 passed，1 skipped，11 deselected；C++ GoogleTest 7/7 passed。GitHub Actions 使用 Ubuntu runner、GCC、CMake、GoogleTest 和 Python 3.12，报告以 artifact 形式保留。
+
+## 阶段八：故障注入、服务端资源监控和版本对比
+
+阶段八在真实服务端环境运行，用于回答“异常输入后服务是否仍然可用”和“新版本是否退化”两个问题。
+
+### 故障注入
+
+`qa/scripts/run_fault_injection.py` 通过公开 TCP 协议发送以下输入：负数包长、超过 1 MiB 的包长、未知消息类型、已知消息类型但字段截断、半包后断开、控制连接突然关闭、媒体连接突然关闭、重复媒体注册和非法房间号。每个场景结束后都会建立新的 TCP 连接；新连接失败就判定服务端监听器被故障拖垮。报告写入 `qa/reports/fault-injection.json`。
+
+```powershell
+python qa/scripts/run_fault_injection.py --scenario all
+```
+
+对应的 pytest 用例在 `qa/tests/test_fault_injection.py`，标记为 `integration`，不会进入阶段七的纯 Python CI 子集。
+
+### 服务端资源监控
+
+`qa/scripts/monitor_server.py` 读取 Linux/WSL `/proc`，记录进程存活、CPU、RSS、虚拟内存、线程数和 TCP 连接数；Windows 原生进程使用 PowerShell 查询同一组指标。结果同时输出 JSON 和 CSV：
+
+```text
+qa/reports/resource-monitor.json
+qa/reports/resource-monitor.csv
+```
+
+对 WSL 服务端，先在 WSL 中取得服务端 PID，再让监控脚本在 WSL 中运行；`run_monitored_load.ps1 -UseWslMonitor` 可以编排监控和阶段六压力脚本。
+
+```powershell
+powershell -ExecutionPolicy Bypass -File qa/scripts/run_monitored_load.ps1 `
+  -ServerPid <WSL_PID> -Duration 60 -Users 5 -Fps 2 -UseWslMonitor
+```
+
+### 版本对比
+
+`qa/scripts/compare_reports.py` 保留 JUnit 失败数比较，并增加压力和资源阈值：成功率下降、P95 上升、媒体投递比例下降、新增错误类型、CPU/RSS/线程/TCP 峰值上升都会报告为 regression。默认阈值分别为 P95 25%、成功率 2 个百分点、投递比例 2 个百分点和资源峰值 50%，可通过命令行覆盖。
+
+```powershell
+python qa/scripts/compare_reports.py qa/reports/current.xml `
+  --baseline qa/reports/baseline.xml `
+  --current-load qa/reports/load-monitored-current.json `
+  --baseline-load qa/reports/load-monitored-baseline.json `
+  --current-resource qa/reports/resource-monitor-current.json `
+  --baseline-resource qa/reports/resource-monitor-baseline.json
+```
+
+### 阶段八文件
+
+```text
+qa/fault_injection.py                    # 可复用故障探针
+qa/scripts/run_fault_injection.py        # 故障注入入口和 JSON 报告
+qa/tests/test_fault_injection.py         # 集成回归用例
+qa/scripts/monitor_server.py             # /proc/PowerShell 资源采样
+qa/scripts/run_monitored_load.ps1        # 监控和压力测试编排
+qa/scripts/compare_reports.py            # JUnit/压力/资源版本门禁
+qa/tests/test_compare_reports.py         # 比较算法纯单测
+```
+
+### 阶段八验收标准
+
+- 任一故障注入场景后，新的登录连接仍可建立，服务端进程不退出；
+- 压力期间资源报告包含至少两个采样点，并记录峰值和进程退出状态；
+- 当前版本相对基线没有超过阈值的成功率、P95、投递比例或资源退化；
+- 所有 JSON、CSV、HTML、JUnit 报告均写入 `qa/reports/`，可按 Git commit 保存到外部制品库。
+
+### 阶段八实际运行记录（2026-11-22）
+
+最终服务端二进制在 WSL2 中完成以下验证：
+
+| 检查 | 结果 |
+| --- | --- |
+| 故障注入 9 场景 | 9/9 通过；每个场景后新连接均可建立 |
+| C++ GoogleTest | 7/7 通过 |
+| 纯 Python CI 子集 | 6 passed，1 skipped（Qt 可选冒烟） |
+| 房间 5×10（10 个 setup worker） | 50/50 成功，0.488s |
+| 媒体 5 用户×60 秒 | 发送 600 帧，接收 2400 帧，投递比例 1.0，P95 7.57ms |
+| 资源监控 | 16 个采样点，进程未退出，峰值 RSS 11940 kB、线程 12 |
+| JUnit/压力/资源版本比较 | no regressions detected |
+
+故障注入期间发现并修复了 `SIGPIPE`、截断包越界、异步 fd 复用污染响应和突发连接接收问题；这些修复已经包含在服务端源代码中。房间压力脚本增加 `--room-workers`，默认 10，避免测试机一次性建立 50 个连接造成 WSL 网络层瞬时拒绝，同时仍保持 50 个用户和 5 个房间的并发创建/加入验证。

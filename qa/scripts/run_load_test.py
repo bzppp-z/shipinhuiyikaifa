@@ -81,9 +81,9 @@ def login_pressure(users: int, workers: int) -> dict:
     }
 
 
-def setup_room(room_count: int, users_per_room: int) -> tuple[list[ProtocolClient], list[int]]:
+def setup_room(room_count: int, users_per_room: int, workers: int) -> tuple[list[ProtocolClient], list[int]]:
     total = room_count * users_per_room
-    with ThreadPoolExecutor(max_workers=min(50, total)) as pool:
+    with ThreadPoolExecutor(max_workers=min(workers, total)) as pool:
         setup_results = list(pool.map(_login_client, range(total)))
     clients = [result[0] for result in setup_results]
     user_ids = [result[1] for result in setup_results]
@@ -106,7 +106,7 @@ def setup_room(room_count: int, users_per_room: int) -> tuple[list[ProtocolClien
         result, joined = clients[index].join_room(user_ids[index], room_ids[room_index])
         return result == 1 and joined == room_ids[room_index]
 
-    with ThreadPoolExecutor(max_workers=min(50, total)) as pool:
+    with ThreadPoolExecutor(max_workers=min(workers, total)) as pool:
         if not all(pool.map(join_room, range(total))):
             raise RuntimeError("room join failed")
     return clients, user_ids
@@ -125,16 +125,17 @@ def _login_client(index: int) -> tuple[ProtocolClient, int]:
     return client, user_id
 
 
-def room_pressure(room_count: int, users_per_room: int) -> dict:
+def room_pressure(room_count: int, users_per_room: int, workers: int) -> dict:
     started = time.perf_counter()
     clients: list[ProtocolClient] = []
     try:
-        clients, _ = setup_room(room_count, users_per_room)
+        clients, _ = setup_room(room_count, users_per_room, workers)
         return {
             "scenario": "rooms",
             "rooms": room_count,
             "users_per_room": users_per_room,
             "users": room_count * users_per_room,
+            "workers": workers,
             "success": room_count * users_per_room,
             "failed": 0,
             "duration_s": round(time.perf_counter() - started, 3),
@@ -145,6 +146,7 @@ def room_pressure(room_count: int, users_per_room: int) -> dict:
             "rooms": room_count,
             "users_per_room": users_per_room,
             "users": room_count * users_per_room,
+            "workers": workers,
             "success": 0,
             "failed": room_count * users_per_room,
             "duration_s": round(time.perf_counter() - started, 3),
@@ -230,18 +232,21 @@ def main() -> int:
     parser.add_argument("--scenario", choices=("login", "rooms", "media", "all"), default="all")
     parser.add_argument("--users", type=int, default=5)
     parser.add_argument("--workers", type=int, default=20)
+    parser.add_argument("--room-workers", type=int, default=10)
     parser.add_argument("--rooms", type=int, default=5)
     parser.add_argument("--users-per-room", type=int, default=10)
     parser.add_argument("--duration", type=int, default=60)
     parser.add_argument("--fps", type=int, default=2)
     parser.add_argument("--output", default="qa/reports/load-result.json")
     args = parser.parse_args()
+    if args.users <= 0 or args.workers <= 0 or args.room_workers <= 0:
+        parser.error("user and worker counts must be positive")
 
     results = []
     if args.scenario in ("login", "all"):
         results.append(login_pressure(args.users, args.workers))
     if args.scenario in ("rooms", "all"):
-        results.append(room_pressure(args.rooms, args.users_per_room))
+        results.append(room_pressure(args.rooms, args.users_per_room, args.room_workers))
     if args.scenario in ("media", "all"):
         results.append(media_pressure(args.users, args.duration, args.fps))
     output = Path(args.output)

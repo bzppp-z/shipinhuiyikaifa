@@ -62,3 +62,37 @@ GitHub Actions 工作流位于 `.github/workflows/qa.yml`，每次 push 或 Pull
 powershell -ExecutionPolicy Bypass -File qa\scripts\run_regression.ps1
 python qa\scripts\run_load_test.py --scenario all
 ```
+
+## 阶段七和阶段八
+
+`.github/workflows/qa.yml` 在 push/PR 时运行 C++ GoogleTest、纯 Python 协议测试和 Qt 资源检查；真实 MySQL、运行中的服务端、房间/音视频集成和压力测试留在本地或专用 WSL 环境。
+
+故障注入（需要服务端运行）：
+
+```powershell
+python qa/scripts/run_fault_injection.py --scenario all
+```
+
+资源监控和压力编排（WSL 服务端）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File qa/scripts/run_monitored_load.ps1 `
+  -ServerPid <WSL_PID> -Duration 60 -Users 5 -Fps 2 -UseWslMonitor
+```
+
+资源报告写入 `qa/reports/resource-monitor*.json` 和 `.csv`。版本对比支持 JUnit、压力 JSON 和资源 JSON：
+
+```powershell
+python qa/scripts/compare_reports.py qa/reports/current.xml `
+  --baseline qa/reports/baseline.xml `
+  --current-load qa/reports/current-load.json `
+  --baseline-load qa/reports/baseline-load.json `
+  --current-resource qa/reports/current-resource.json `
+  --baseline-resource qa/reports/baseline-resource.json
+```
+
+房间压力默认使用 10 个 setup worker，仍创建 5 个房间、每房间 10 用户；可通过 `--room-workers` 调整连接建立并发度：
+
+```powershell
+python qa/scripts/run_load_test.py --scenario rooms --rooms 5 --users-per-room 10 --room-workers 10
+```

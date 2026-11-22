@@ -6,6 +6,35 @@
 
 using namespace std;
 
+namespace {
+bool hasMinimumPacketSize(PackType type, int nlen)
+{
+    switch (type)
+    {
+    case _DEF_PACK_REGISTER_RQ:
+        return nlen >= static_cast<int>(sizeof(STRU_REGISTER_RQ));
+    case _DEF_PACK_LOGIN_RQ:
+        return nlen >= static_cast<int>(sizeof(STRU_LOGIN_RQ));
+    case _DEF_PACK_CREATEROOM_RQ:
+        return nlen >= static_cast<int>(sizeof(STRU_CREATEROOM_RQ));
+    case _DEF_PACK_JOINROOM_RQ:
+        return nlen >= static_cast<int>(sizeof(STRU_JOINROOM_RQ));
+    case _DEF_PACK_LEAVEROOM_RQ:
+        return nlen >= static_cast<int>(sizeof(STRU_LEAVEROOM_RQ));
+    case _DEF_PACK_AUDIO_REGISTER:
+    case _DEF_PACK_VIDEO_REGISTER:
+        return nlen >= static_cast<int>(sizeof(STRU_AUDIO_REGISTER));
+    case _DEF_PACK_AUDIO_FRAME:
+    case _DEF_PACK_VIDEO_FRAME:
+        // The router needs type, sender id and room id.  The media body may
+        // be empty in a malformed packet, but those three fields are required.
+        return nlen >= static_cast<int>(sizeof(PackType) + sizeof(int) + sizeof(int));
+    default:
+        return true;
+    }
+}
+}
+
 
 //设置网络协议映射
 void TcpKernel::setNetPackMap()
@@ -37,6 +66,9 @@ TcpKernel *TcpKernel::GetInstance()
 
 int TcpKernel::Open( int port)
 {
+    // A peer is allowed to close while another worker is sending a response.
+    // Do not let that ordinary network race terminate the whole process.
+    signal(SIGPIPE, SIG_IGN);
     initRand();
 
     m_sql = new CMysql;
@@ -79,9 +111,13 @@ void TcpKernel::initRand()
 
 void TcpKernel::DealData(sock_fd clientfd,char *szbuf,int nlen)
 {
+    if (szbuf == NULL || nlen < static_cast<int>(sizeof(PackType)))
+        return;
     PackType type = *(PackType*)szbuf;
     if( (type >= _DEF_PACK_BASE) && ( type < _DEF_PACK_BASE + _DEF_PACK_COUNT) )
     {
+        if (!hasMinimumPacketSize(type, nlen))
+            return;
         PFUN pf = NetPackMap( type );
         if( pf )
         {

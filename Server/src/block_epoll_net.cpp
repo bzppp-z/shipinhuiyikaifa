@@ -19,7 +19,11 @@ bool read_full(int fd, char *buffer, int size)
     }
     return true;
 }
+
 }
+
+thread_local uint64_t Block_Epoll_Net::s_dispatch_eventId = 0;
+thread_local int Block_Epoll_Net::s_dispatch_fd = -1;
 
 
 bool Block_Epoll_Net::InitNet(int port, void (*recv_callback)(int, char *, int))
@@ -127,41 +131,35 @@ void Block_Epoll_Net::EventLoop()
 
 void Block_Epoll_Net::accept_event()
 {
-    struct sockaddr_in caddr;
-    socklen_t len = sizeof(caddr);
-    int clientfd ;
-    if ((clientfd = accept(m_listenfd, (struct sockaddr *)&caddr, &len)) == -1) {
-        if (errno != EAGAIN && errno != EINTR) {
-            /* 暂时不做出错处理 */
+    // Drain all ready sockets in one notification so a burst does not fill
+    // the listen queue during login pressure.
+    while (true)
+    {
+        struct sockaddr_in caddr;
+        socklen_t len = sizeof(caddr);
+        int clientfd = accept(m_listenfd, (struct sockaddr *)&caddr, &len);
+        if (clientfd == -1)
+        {
+            if (errno == EINTR)
+                continue;
+            if (errno != EAGAIN && errno != EWOULDBLOCK)
+                printf("%s: accept, %s\n", __func__, strerror(errno));
+            return;
         }
-        printf("%s: accept, %s\n", __func__, strerror(errno));
-        return;
+
+        setRecvBufSize(clientfd);
+        setNoDelay(clientfd);
+
+        myevent_s * clientEv = new myevent_s(this);
+        clientEv->connectionId = ++m_nextConnectionId;
+        clientEv->eventset(clientfd, m_epoll_fd);
+        clientEv->eventadd(EPOLLIN | EPOLLONESHOT);
+        m_mapSockfdToEvent.insert(clientfd, clientEv);
+
+        printf("new connect [%s:%d][time:%ld] \n",
+               inet_ntoa(caddr.sin_addr), ntohs(caddr.sin_port), time(NULL));
     }
-    //    //客户端接收使用阻塞模式 更简单 适合入门
-    //    //设置非阻塞
-    //    setNonBlockFd( clientfd );
-    //设置接收缓冲区大小
-    setRecvBufSize( clientfd );
-    //设置发送缓冲区大小
-    setRecvBufSize( clientfd );
-    //设置 无延迟
-    setNoDelay( clientfd );
-
-    myevent_s * clientEv = new myevent_s(this);
-    clientEv->eventset( clientfd , m_epoll_fd );
-    // 使用EPOLLONESHOT epoll监听不会重复检测 避免多线程并发 使得同一个套接字接收是排队的
-    clientEv->eventadd(  EPOLLIN/*|EPOLLET*/|EPOLLONESHOT );
-
-    //m_mapSockfdToEvent[clientfd] = clientEv;
-    m_mapSockfdToEvent.insert(clientfd , clientEv);
-
-    printf("new connect [%s:%d][time:%ld] \n",
-           inet_ntoa(caddr.sin_addr), ntohs(caddr.sin_port), time(NULL) );
-    return;
 }
-
-
-
 
 void Block_Epoll_Net::recv_event( myevent_s *ev)
 {
@@ -195,7 +193,8 @@ void* Block_Epoll_Net::recv_task(void* arg)
             break;
         }
         //接收和处理分离 跑线程池里其他线程处理 , 避免处理影响接收
-        DataBuffer * buffer = new DataBuffer(ev->pNet , ev->fd , pSzBuf , nOffSet );
+        DataBuffer * buffer = new DataBuffer(ev->pNet , ev->fd , pSzBuf , nOffSet,
+                                             ev->connectionId );
         pthis->m_threadpool->Producer_add(  Buffer_Deal , (void*) buffer );
 
         // 这次接收完 要重新注册事件  此时 EPOLL MODE -> EPOLLIN|EPOLLONESHOT 没有修改, 使用重复值
@@ -221,7 +220,9 @@ void * Block_Epoll_Net::Buffer_Deal( void * arg )
     DataBuffer * buffer = (DataBuffer *)arg;
     if( !buffer ) return NULL;
 
+    buffer->pNet->setDispatchEvent(buffer->eventId, buffer->sockfd);
     buffer->pNet->m_recv_callback(buffer->sockfd,buffer->buf,buffer->nlen);
+    buffer->pNet->setDispatchEvent(0, -1);
 
     //   printf("pszbuf = %p \n",buffer->buf);
     if(buffer->buf != NULL)
@@ -231,6 +232,20 @@ void * Block_Epoll_Net::Buffer_Deal( void * arg )
     }
     delete buffer;
     return 0;
+}
+
+bool Block_Epoll_Net::isCurrentEvent(int fd, uint64_t eventId)
+{
+    if (eventId == 0 || !m_mapSockfdToEvent.IsExist(fd))
+        return false;
+    myevent_s* current = m_mapSockfdToEvent.find(fd);
+    return current != NULL && current->connectionId == eventId;
+}
+
+void Block_Epoll_Net::setDispatchEvent(uint64_t eventId, int fd)
+{
+    s_dispatch_eventId = eventId;
+    s_dispatch_fd = fd;
 }
 
 void Block_Epoll_Net::epollout_event( myevent_s *ev )
@@ -255,7 +270,16 @@ int Block_Epoll_Net::SendData(int fd, char *szbuf, int nlen)
     vector<char> frame = FrameCodec::encode(szbuf, nlen);
     if(frame.empty())
         return -1;
-    return send(fd, frame.data(), frame.size(), 0);
+    if (s_dispatch_eventId != 0 && s_dispatch_fd == fd &&
+            !isCurrentEvent(fd, s_dispatch_eventId))
+        return -1;
+    if (!m_mapSockfdToEvent.IsExist(fd))
+        return -1;
+    int sendFlags = 0;
+#ifdef MSG_NOSIGNAL
+    sendFlags |= MSG_NOSIGNAL;
+#endif
+    return send(fd, frame.data(), frame.size(), sendFlags);
 }
 
 void Block_Epoll_Net::setNonBlockFd(int fd)

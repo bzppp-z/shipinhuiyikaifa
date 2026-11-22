@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <stdint.h>
 #include<iostream>
 #include<vector>
 #include<list>
@@ -26,17 +27,22 @@ using namespace  std;
 
 
 class Block_Epoll_Net;
+struct myevent_s;
 
 //数据缓存
 struct DataBuffer
 {
-    DataBuffer( Block_Epoll_Net* _pNet,  int _sock , char* _buf , int _nlen )
-        :pNet(_pNet),sockfd(_sock),buf(_buf),nlen(_nlen){}
+    DataBuffer( Block_Epoll_Net* _pNet,  int _sock , char* _buf , int _nlen,
+                uint64_t _eventId )
+        :pNet(_pNet),sockfd(_sock),buf(_buf),nlen(_nlen),eventId(_eventId){}
 
     Block_Epoll_Net* pNet;
     int sockfd;
     char* buf;
     int nlen;
+    // A raw fd can be reused immediately after disconnect, so fd alone is
+    // unsafe. The monotonically increasing id prevents ABA reuse.
+    uint64_t eventId;
 
 };
 
@@ -87,6 +93,7 @@ private:
 struct myevent_s {
 
     int fd; //cfd listenfd
+    uint64_t connectionId;
     int epoll_fd; //epoll_create 句柄
     int events; //EPOLLIN EPLLOUT
     int status;/* status:1表示在监听事件中，0表示不在 */
@@ -95,6 +102,7 @@ struct myevent_s {
     myevent_s(Block_Epoll_Net* _pNet)
     {
         this->pNet = _pNet;
+        this->connectionId = 0;
     }
     void eventset(int fd ,int efd/*epoll_create返回的句柄*/)
     {
@@ -140,7 +148,7 @@ struct myevent_s {
 class Block_Epoll_Net
 {
 public:
-    Block_Epoll_Net(){}
+    Block_Epoll_Net() : m_nextConnectionId(0){}
     ~Block_Epoll_Net(){}
     //由于服务器 不会主动关闭, 没有写回收
 public:
@@ -168,6 +176,9 @@ private:
     //线程函数 接收数据
     static void *recv_task(void *arg);
 
+    bool isCurrentEvent(int fd, uint64_t eventId);
+    void setDispatchEvent(uint64_t eventId, int fd);
+
     //epoll事件处理
     void accept_event();
     void recv_event(myevent_s *ev); //接收: 事件到来recv_event --> 接收数据 recv_task -> 处理 Buffer_Deal
@@ -185,6 +196,12 @@ private:
     struct epoll_event events[MAX_EVENTS+1];
     //线程池相关
     thread_pool *m_threadpool;
+
+    // Set only while Buffer_Deal invokes the protocol callback.  It lets
+    // SendData reject a late response from an event whose fd was reused.
+    static thread_local uint64_t s_dispatch_eventId;
+    static thread_local int s_dispatch_fd;
+    uint64_t m_nextConnectionId;
 
 
 };

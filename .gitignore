@@ -39,3 +39,5 @@ qa/reports/*
 Server/Server
 
 qa/cpp_unit/build/
+
+qa/.pytest-tmp/
